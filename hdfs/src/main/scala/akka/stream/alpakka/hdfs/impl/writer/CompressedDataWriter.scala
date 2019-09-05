@@ -4,12 +4,14 @@
 
 package akka.stream.alpakka.hdfs.impl.writer
 
+import java.util
+
 import akka.annotation.InternalApi
 import akka.stream.alpakka.hdfs.FilePathGenerator
 import akka.stream.alpakka.hdfs.impl.writer.HdfsWriter._
 import akka.util.ByteString
 import org.apache.commons.io.FilenameUtils
-import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
+import org.apache.hadoop.fs.{CreateFlag, FSDataOutputStream, FileContext, FileSystem, Options, Path}
 import org.apache.hadoop.io.compress.{CodecPool, CompressionCodec, CompressionOutputStream, Compressor}
 
 /**
@@ -18,6 +20,7 @@ import org.apache.hadoop.io.compress.{CodecPool, CompressionCodec, CompressionOu
 @InternalApi
 private[writer] final case class CompressedDataWriter(
     override val fs: FileSystem,
+    override val fc: FileContext,
     compressionCodec: CompressionCodec,
     override val pathGenerator: FilePathGenerator,
     maybeTargetPath: Option[Path],
@@ -46,7 +49,13 @@ private[writer] final case class CompressedDataWriter(
     copy(maybeTargetPath = Some(outputFileWithExtension(rotationCount)))
   }
 
-  override protected def create(fs: FileSystem, file: Path): FSDataOutputStream = fs.create(file, overwrite)
+  override protected def create(fc: FileContext, file: Path): FSDataOutputStream = {
+    val createFlag = util.EnumSet.of(CreateFlag.CREATE)
+    if (overwrite) createFlag.add(CreateFlag.OVERWRITE)
+    // FIXME defaults seems to be the same except for block size which transitions
+    //  from 32MB to 64MB
+    fc.create(file, createFlag, Options.CreateOpts.createParent())
+  }
 
   private def outputFileWithExtension(rotationCount: Long): Path = {
     val candidatePath = createTargetPath(pathGenerator, rotationCount)
@@ -66,9 +75,10 @@ private[writer] final case class CompressedDataWriter(
 private[hdfs] object CompressedDataWriter {
   def apply(
       fs: FileSystem,
+      fc: FileContext,
       compressionCodec: CompressionCodec,
       pathGenerator: FilePathGenerator,
       overwrite: Boolean
   ): CompressedDataWriter =
-    new CompressedDataWriter(fs, compressionCodec, pathGenerator, None, overwrite)
+    new CompressedDataWriter(fs, fc, compressionCodec, pathGenerator, None, overwrite)
 }

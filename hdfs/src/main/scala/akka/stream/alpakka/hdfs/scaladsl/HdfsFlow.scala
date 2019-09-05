@@ -10,7 +10,7 @@ import akka.stream.alpakka.hdfs.impl.HdfsFlowStage
 import akka.stream.alpakka.hdfs.impl.writer.{CompressedDataWriter, DataWriter, SequenceWriter}
 import akka.stream.scaladsl.Flow
 import akka.util.ByteString
-import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem}
+import org.apache.hadoop.fs.{FSDataOutputStream, FileContext, FileSystem}
 import org.apache.hadoop.io.SequenceFile.CompressionType
 import org.apache.hadoop.io.compress.CompressionCodec
 import org.apache.hadoop.io.{SequenceFile, Writable}
@@ -25,17 +25,19 @@ object HdfsFlow {
    * Scala API: creates a Flow for [[org.apache.hadoop.fs.FSDataOutputStream]]
    *
    * @param fs Hadoop file system
+   * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param settings hdfs writing settings
    */
   def data(
       fs: FileSystem,
+      fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
       settings: HdfsWritingSettings
   ): Flow[HdfsWriteMessage[ByteString, NotUsed], RotationMessage, NotUsed] =
-    dataWithPassThrough[NotUsed](fs, syncStrategy, rotationStrategy, settings)
+    dataWithPassThrough[NotUsed](fs, fc, syncStrategy, rotationStrategy, settings)
       .collect(OnlyRotationMessage)
 
   /**
@@ -43,12 +45,14 @@ object HdfsFlow {
    * with `passThrough` of type `C`
    *
    * @param fs Hadoop file system
+   * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param settings hdfs writing settings
    */
   def dataWithPassThrough[P](
       fs: FileSystem,
+      fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
       settings: HdfsWritingSettings
@@ -59,7 +63,7 @@ object HdfsFlow {
           syncStrategy,
           rotationStrategy,
           settings,
-          DataWriter(fs, settings.pathGenerator, settings.overwrite)
+          DataWriter(fs, fc, settings.pathGenerator, settings.overwrite)
         )
       )
 
@@ -67,6 +71,7 @@ object HdfsFlow {
    * Scala API: creates a Flow for [[org.apache.hadoop.io.compress.CompressionOutputStream]]
    *
    * @param fs Hadoop file system
+   * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param compressionCodec a streaming compression/decompression pair
@@ -74,19 +79,27 @@ object HdfsFlow {
    */
   def compressed(
       fs: FileSystem,
+      fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
       compressionCodec: CompressionCodec,
       settings: HdfsWritingSettings
   ): Flow[HdfsWriteMessage[ByteString, NotUsed], RotationMessage, NotUsed] =
-    compressedWithPassThrough[NotUsed](fs, syncStrategy, rotationStrategy, compressionCodec, settings)
-      .collect(OnlyRotationMessage)
+    compressedWithPassThrough[NotUsed](
+      fs,
+      fc,
+      syncStrategy,
+      rotationStrategy,
+      compressionCodec,
+      settings
+    ).collect(OnlyRotationMessage)
 
   /**
    * Scala API: creates a Flow for [[org.apache.hadoop.io.compress.CompressionOutputStream]]
    * with `passThrough` of type `C`
    *
    * @param fs Hadoop file system
+   * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param compressionCodec a streaming compression/decompression pair
@@ -94,6 +107,7 @@ object HdfsFlow {
    */
   def compressedWithPassThrough[P](
       fs: FileSystem,
+      fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
       compressionCodec: CompressionCodec,
@@ -107,6 +121,7 @@ object HdfsFlow {
           settings,
           CompressedDataWriter(
             fs,
+            fc,
             compressionCodec,
             settings.pathGenerator,
             settings.overwrite
@@ -119,6 +134,7 @@ object HdfsFlow {
    * without a compression
    *
    * @param fs Hadoop file system
+   * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param settings hdfs writing settings
@@ -127,20 +143,29 @@ object HdfsFlow {
    */
   def sequence[K <: Writable, V <: Writable](
       fs: FileSystem,
+      fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
       settings: HdfsWritingSettings,
       classK: Class[K],
       classV: Class[V]
   ): Flow[HdfsWriteMessage[(K, V), NotUsed], RotationMessage, NotUsed] =
-    sequenceWithPassThrough[K, V, NotUsed](fs, syncStrategy, rotationStrategy, settings, classK, classV)
-      .collect(OnlyRotationMessage)
+    sequenceWithPassThrough[K, V, NotUsed](
+      fs,
+      fc,
+      syncStrategy,
+      rotationStrategy,
+      settings,
+      classK,
+      classV
+    ).collect(OnlyRotationMessage)
 
   /**
    * Scala API: creates a Flow for [[org.apache.hadoop.io.SequenceFile.Writer]]
    * with a compression
    *
    * @param fs Hadoop file system
+   * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param compressionType a compression type used to compress key/value pairs in the SequenceFile
@@ -151,6 +176,7 @@ object HdfsFlow {
    */
   def sequence[K <: Writable, V <: Writable](
       fs: FileSystem,
+      fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
       compressionType: CompressionType,
@@ -161,6 +187,7 @@ object HdfsFlow {
   ): Flow[HdfsWriteMessage[(K, V), NotUsed], RotationMessage, NotUsed] =
     sequenceWithPassThrough[K, V, NotUsed](
       fs,
+      fc,
       syncStrategy,
       rotationStrategy,
       compressionType,
@@ -175,6 +202,7 @@ object HdfsFlow {
    * with `passThrough` of type `C` and without a compression
    *
    * @param fs sync strategy
+   * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param settings Hdfs writing settings
@@ -183,6 +211,7 @@ object HdfsFlow {
    */
   def sequenceWithPassThrough[K <: Writable, V <: Writable, P](
       fs: FileSystem,
+      fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
       settings: HdfsWritingSettings,
@@ -195,7 +224,7 @@ object HdfsFlow {
           syncStrategy,
           rotationStrategy,
           settings,
-          SequenceWriter(fs, classK, classV, settings.pathGenerator, settings.overwrite)
+          SequenceWriter(fs, fc, fs.getConf, classK, classV, settings.pathGenerator, settings.overwrite)
         )
       )
 
@@ -204,6 +233,7 @@ object HdfsFlow {
    * with `passThrough` of type `C` and a compression
    *
    * @param fs Hadoop file system
+   * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param compressionType a compression type used to compress key/value pairs in the SequenceFile
@@ -214,6 +244,7 @@ object HdfsFlow {
    */
   def sequenceWithPassThrough[K <: Writable, V <: Writable, P](
       fs: FileSystem,
+      fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
       compressionType: CompressionType,
@@ -229,6 +260,8 @@ object HdfsFlow {
           rotationStrategy,
           settings,
           SequenceWriter(fs,
+                         fc,
+                         fs.getConf,
                          compressionType,
                          compressionCodec,
                          classK,

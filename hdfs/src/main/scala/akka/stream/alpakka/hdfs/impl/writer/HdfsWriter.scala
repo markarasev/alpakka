@@ -7,7 +7,8 @@ package akka.stream.alpakka.hdfs.impl.writer
 import akka.annotation.InternalApi
 import akka.stream.alpakka.hdfs.FilePathGenerator
 import akka.stream.alpakka.hdfs.impl.writer.HdfsWriter._
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.permission.FsPermission
+import org.apache.hadoop.fs.{FileContext, FileSystem, Options, Path}
 
 /**
  * Internal API
@@ -15,16 +16,13 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 @InternalApi
 private[hdfs] trait HdfsWriter[W, I] {
 
-  protected lazy val output: W = create(fs, temp)
+  protected lazy val output: W = create(fc, temp)
 
   protected lazy val temp: Path = tempFromTarget(pathGenerator, target)
 
-  def moveToTarget(): Boolean = {
-    if (!fs.exists(target.getParent))
-      fs.mkdirs(target.getParent)
-    // mimics FileContext#rename(temp, target, Options.Rename.Overwrite) semantics
-    if (overwrite) fs.delete(target, false)
-    fs.rename(temp, target)
+  def moveToTarget(): Unit = {
+    fc.mkdir(target.getParent, FsPermission.getDirDefault, true)
+    fc.rename(temp, target, Options.Rename.OVERWRITE)
   }
 
   def sync(): Unit
@@ -37,13 +35,17 @@ private[hdfs] trait HdfsWriter[W, I] {
 
   protected def target: Path
 
+  // FIXME remove when finished
+  @deprecated
   protected def fs: FileSystem
+
+  protected def fc: FileContext
 
   protected def overwrite: Boolean
 
   protected def pathGenerator: FilePathGenerator
 
-  protected def create(fs: FileSystem, file: Path): W
+  protected def create(fc: FileContext, file: Path): W
 
 }
 

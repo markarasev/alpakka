@@ -19,6 +19,7 @@ import akka.stream.javadsl.Source;
 import akka.testkit.javadsl.TestKit;
 import akka.util.ByteString;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileContext;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
@@ -43,6 +44,7 @@ public class HdfsReaderTest {
   private static ActorMaterializer materializer;
   private static String destination = JavaTestUtils.destination();
   private static FileSystem fs = null;
+  private static FileContext fc = null;
   private static HdfsWritingSettings settings = HdfsWritingSettings.create();
 
   @Test
@@ -51,7 +53,7 @@ public class HdfsReaderTest {
 
     Flow<HdfsWriteMessage<ByteString, NotUsed>, RotationMessage, NotUsed> flow =
         HdfsFlow.data(
-            fs, SyncStrategy.count(500), RotationStrategy.size(0.5, FileUnit.KB()), settings);
+            fs, fc, SyncStrategy.count(500), RotationStrategy.size(0.5, FileUnit.KB()), settings);
 
     CompletionStage<List<RotationMessage>> resF =
         Source.from(data).map(HdfsWriteMessage::create).via(flow).runWith(Sink.seq(), materializer);
@@ -84,7 +86,12 @@ public class HdfsReaderTest {
 
     Flow<HdfsWriteMessage<ByteString, NotUsed>, RotationMessage, NotUsed> flow =
         HdfsFlow.compressed(
-            fs, SyncStrategy.count(1), RotationStrategy.size(0.1, FileUnit.MB()), codec, settings);
+            fs,
+            fc,
+            SyncStrategy.count(1),
+            RotationStrategy.size(0.1, FileUnit.MB()),
+            codec,
+            settings);
 
     List<ByteString> content =
         JavaTestUtils.generateFakeContentWithPartitions(1, FileUnit.MB().byteCount(), 30);
@@ -121,6 +128,7 @@ public class HdfsReaderTest {
     Flow<HdfsWriteMessage<Pair<Text, Text>, NotUsed>, RotationMessage, NotUsed> flow =
         HdfsFlow.sequence(
             fs,
+            fc,
             SyncStrategy.none(),
             RotationStrategy.size(1, FileUnit.MB()),
             settings,
@@ -161,6 +169,7 @@ public class HdfsReaderTest {
     conf.set("fs.default.name", "hdfs://localhost:54310");
 
     fs = FileSystem.get(conf);
+    fc = FileContext.getFileContext(conf);
 
     system = ActorSystem.create();
     materializer = ActorMaterializer.create(system);

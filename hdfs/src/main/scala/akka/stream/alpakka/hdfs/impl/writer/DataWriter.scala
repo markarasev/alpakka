@@ -4,11 +4,13 @@
 
 package akka.stream.alpakka.hdfs.impl.writer
 
+import java.util
+
 import akka.annotation.InternalApi
 import akka.stream.alpakka.hdfs.FilePathGenerator
 import akka.stream.alpakka.hdfs.impl.writer.HdfsWriter._
 import akka.util.ByteString
-import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
+import org.apache.hadoop.fs.{CreateFlag, FSDataOutputStream, FileContext, FileSystem, Options, Path}
 
 /**
  * Internal API
@@ -16,6 +18,7 @@ import org.apache.hadoop.fs.{FSDataOutputStream, FileSystem, Path}
 @InternalApi
 private[writer] final case class DataWriter(
     override val fs: FileSystem,
+    override val fc: FileContext,
     override val pathGenerator: FilePathGenerator,
     maybeTargetPath: Option[Path],
     override val overwrite: Boolean
@@ -38,11 +41,22 @@ private[writer] final case class DataWriter(
     copy(maybeTargetPath = Some(createTargetPath(pathGenerator, rotationCount)))
   }
 
-  override def create(fs: FileSystem, file: Path): FSDataOutputStream = fs.create(file, overwrite)
+  override protected def create(fc: FileContext, file: Path): FSDataOutputStream = {
+    val createFlag = util.EnumSet.of(CreateFlag.CREATE)
+    if (overwrite) createFlag.add(CreateFlag.OVERWRITE)
+    // FIXME defaults seems to be the same except for block size which transitions
+    //  from 32MB to 64MB
+    fc.create(file, createFlag, Options.CreateOpts.createParent())
+  }
 
 }
 
 private[hdfs] object DataWriter {
-  def apply(fs: FileSystem, pathGenerator: FilePathGenerator, overwrite: Boolean): DataWriter =
-    new DataWriter(fs, pathGenerator, None, overwrite)
+  def apply(
+      fs: FileSystem,
+      fc: FileContext,
+      pathGenerator: FilePathGenerator,
+      overwrite: Boolean
+  ): DataWriter =
+    new DataWriter(fs, fc, pathGenerator, None, overwrite)
 }

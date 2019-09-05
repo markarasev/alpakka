@@ -7,7 +7,8 @@ package akka.stream.alpakka.hdfs.impl.writer
 import akka.annotation.InternalApi
 import akka.stream.alpakka.hdfs.FilePathGenerator
 import akka.stream.alpakka.hdfs.impl.writer.HdfsWriter._
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileContext, FileSystem, Path}
 import org.apache.hadoop.io.SequenceFile.{CompressionType, Writer}
 import org.apache.hadoop.io.compress.CompressionCodec
 import org.apache.hadoop.io.{SequenceFile, Writable}
@@ -18,6 +19,8 @@ import org.apache.hadoop.io.{SequenceFile, Writable}
 @InternalApi
 private[writer] final case class SequenceWriter[K <: Writable, V <: Writable](
     override val fs: FileSystem,
+    override val fc: FileContext,
+    conf: Configuration, // FIXME deduplicate with fc
     writerOptions: Seq[Writer.Option],
     override val pathGenerator: FilePathGenerator,
     override val overwrite: Boolean,
@@ -39,9 +42,9 @@ private[writer] final case class SequenceWriter[K <: Writable, V <: Writable](
     copy(maybeTargetPath = Some(createTargetPath(pathGenerator, rotationCount)))
   }
 
-  override protected def create(fs: FileSystem, file: Path): SequenceFile.Writer = {
+  override protected def create(fc: FileContext, file: Path): Writer = {
     val ops = SequenceFile.Writer.file(file) +: writerOptions
-    SequenceFile.createWriter(fs.getConf, ops: _*)
+    SequenceFile.createWriter(conf, ops: _*)
   }
 
 }
@@ -53,15 +56,27 @@ private[writer] final case class SequenceWriter[K <: Writable, V <: Writable](
 private[hdfs] object SequenceWriter {
   def apply[K <: Writable, V <: Writable](
       fs: FileSystem,
+      fc: FileContext,
+      conf: Configuration,
       classK: Class[K],
       classV: Class[V],
       pathGenerator: FilePathGenerator,
       overwrite: Boolean
   ): SequenceWriter[K, V] =
-    new SequenceWriter[K, V](fs, options(classK, classV), pathGenerator, overwrite, None)
+    new SequenceWriter[K, V](
+      fs,
+      fc,
+      conf,
+      options(classK, classV),
+      pathGenerator,
+      overwrite,
+      None
+    )
 
   def apply[K <: Writable, V <: Writable](
       fs: FileSystem,
+      fc: FileContext,
+      conf: Configuration,
       compressionType: CompressionType,
       compressionCodec: CompressionCodec,
       classK: Class[K],
@@ -70,6 +85,8 @@ private[hdfs] object SequenceWriter {
       overwrite: Boolean
   ): SequenceWriter[K, V] =
     new SequenceWriter[K, V](fs,
+                             fc,
+                             conf,
                              options(compressionType, compressionCodec, classK, classV),
                              pathGenerator,
                              overwrite,

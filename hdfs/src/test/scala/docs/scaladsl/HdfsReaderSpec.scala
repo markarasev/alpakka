@@ -11,7 +11,7 @@ import akka.stream.alpakka.hdfs.scaladsl.{HdfsFlow, HdfsSource}
 import akka.stream.alpakka.hdfs.util.ScalaTestUtils._
 import akka.stream.scaladsl.{Sink, Source}
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{FileContext, FileSystem, Path}
 import org.apache.hadoop.hdfs.MiniDFSCluster
 import org.apache.hadoop.io.Text
 import org.apache.hadoop.io.compress.DefaultCodec
@@ -32,6 +32,7 @@ class HdfsReaderSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
   conf.set("fs.default.name", "hdfs://localhost:54310")
 
   val fs: FileSystem = FileSystem.get(conf)
+  val fc: FileContext = FileContext.getFileContext(conf)
   val settings = HdfsWritingSettings()
 
   implicit val ec: ExecutionContextExecutor = system.dispatcher
@@ -40,6 +41,7 @@ class HdfsReaderSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
     "read data file" in {
       val flow = HdfsFlow.data(
         fs,
+        fc,
         SyncStrategy.count(500),
         RotationStrategy.size(0.5, FileUnit.KB),
         HdfsWritingSettings()
@@ -77,6 +79,7 @@ class HdfsReaderSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
 
       val flow = HdfsFlow.compressed(
         fs,
+        fc,
         SyncStrategy.count(1),
         RotationStrategy.size(0.1, FileUnit.MB),
         codec,
@@ -112,6 +115,7 @@ class HdfsReaderSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
     "read sequence file" in {
       val flow = HdfsFlow.sequence(
         fs,
+        fc,
         SyncStrategy.none,
         RotationStrategy.size(1, FileUnit.MB),
         settings,

@@ -11,7 +11,7 @@ import akka.stream.alpakka.hdfs.scaladsl.HdfsFlow
 import akka.stream.alpakka.hdfs.util.ScalaTestUtils._
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.util.ByteString
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileContext, Path}
 import org.apache.hadoop.hdfs.MiniDFSCluster
 import org.apache.hadoop.io.SequenceFile.CompressionType
 import org.apache.hadoop.io.Text
@@ -39,6 +39,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
   conf.set("fs.default.name", "hdfs://localhost:54310")
 
   val fs: FileSystem = FileSystem.get(conf)
+  val fc: FileContext = FileContext.getFileContext(conf)
   //#init-client
 
   implicit val ec: ExecutionContextExecutor = system.dispatcher
@@ -62,6 +63,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
         .via(
           HdfsFlow.data(
             fs,
+            fc,
             SyncStrategy.none,
             RotationStrategy.none,
             HdfsWritingSettings()
@@ -81,6 +83,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
     "use file size rotation and produce five files" in {
       val flow = HdfsFlow.data(
         fs,
+        fc,
         SyncStrategy.count(50),
         RotationStrategy.size(0.01, FileUnit.KB),
         settings
@@ -111,6 +114,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
 
       val flow = HdfsFlow.data(
         fs,
+        fc,
         SyncStrategy.count(500),
         RotationStrategy.size(0.5, FileUnit.KB),
         HdfsWritingSettings()
@@ -140,6 +144,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
       //#define-data
       val flow = HdfsFlow.data(
         fs,
+        fc,
         SyncStrategy.count(500),
         RotationStrategy.size(1, FileUnit.GB),
         HdfsWritingSettings()
@@ -163,6 +168,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
     "use buffer rotation and produce three files" in {
       val flow = HdfsFlow.data(
         fs,
+        fc,
         SyncStrategy.count(1),
         RotationStrategy.count(2),
         settings
@@ -188,6 +194,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
         .via(
           HdfsFlow.data(
             fs,
+            fc,
             SyncStrategy.none,
             RotationStrategy.time(500.milliseconds),
             HdfsWritingSettings()
@@ -205,6 +212,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
     "should use no rotation and produce one file" in {
       val flow = HdfsFlow.data(
         fs,
+        fc,
         SyncStrategy.none,
         RotationStrategy.none,
         HdfsWritingSettings()
@@ -258,6 +266,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
         .via(
           HdfsFlow.dataWithPassThrough[KafkaOffset](
             fs,
+            fc,
             SyncStrategy.count(50),
             RotationStrategy.count(4),
             HdfsWritingSettings().withNewLine(true)
@@ -302,6 +311,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
       //#define-compress
       val flow = HdfsFlow.compressed(
         fs,
+        fc,
         SyncStrategy.count(1),
         RotationStrategy.size(0.1, FileUnit.MB),
         codec,
@@ -336,6 +346,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
 
       val flow = HdfsFlow.compressed(
         fs,
+        fc,
         SyncStrategy.count(1),
         RotationStrategy.count(1),
         codec,
@@ -367,6 +378,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
 
       val flow = HdfsFlow.compressed(
         fs,
+        fc,
         SyncStrategy.none,
         RotationStrategy.none,
         codec,
@@ -396,6 +408,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
       //#define-sequence
       val flow = HdfsFlow.sequence(
         fs,
+        fc,
         SyncStrategy.none,
         RotationStrategy.size(1, FileUnit.MB),
         settings,
@@ -426,6 +439,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
       //#define-sequence-compressed
       val flow = HdfsFlow.sequence(
         fs,
+        fc,
         SyncStrategy.none,
         RotationStrategy.size(1, FileUnit.MB),
         CompressionType.BLOCK,
@@ -454,6 +468,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
     "use buffer rotation and produce five files" in {
       val flow = HdfsFlow.sequence(
         fs,
+        fc,
         SyncStrategy.none,
         RotationStrategy.count(1),
         settings,
@@ -479,6 +494,7 @@ class HdfsWriterSpec extends WordSpecLike with Matchers with BeforeAndAfterAll w
     "should use no rotation and produce one file" in {
       val flow = HdfsFlow.sequence(
         fs,
+        fc,
         SyncStrategy.none,
         RotationStrategy.none,
         settings,
