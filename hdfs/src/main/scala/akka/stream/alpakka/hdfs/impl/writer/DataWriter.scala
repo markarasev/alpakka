@@ -10,14 +10,13 @@ import akka.annotation.InternalApi
 import akka.stream.alpakka.hdfs.FilePathGenerator
 import akka.stream.alpakka.hdfs.impl.writer.HdfsWriter._
 import akka.util.ByteString
-import org.apache.hadoop.fs.{CreateFlag, FSDataOutputStream, FileContext, FileSystem, Options, Path}
+import org.apache.hadoop.fs.{CreateFlag, FSDataOutputStream, FileContext, Options, Path}
 
 /**
  * Internal API
  */
 @InternalApi
 private[writer] final case class DataWriter(
-    override val fs: FileSystem,
     override val fc: FileContext,
     override val pathGenerator: FilePathGenerator,
     maybeTargetPath: Option[Path],
@@ -53,10 +52,9 @@ private[writer] final case class DataWriter(
 
 private[hdfs] object DataWriter {
   def apply(
-      fs: FileSystem,
       fc: FileContext,
       pathGenerator: FilePathGenerator,
       overwrite: Boolean
   ): DataWriter =
-    new DataWriter(fs, fc, pathGenerator, None, overwrite)
+    new DataWriter(fc, pathGenerator, None, overwrite)
 }

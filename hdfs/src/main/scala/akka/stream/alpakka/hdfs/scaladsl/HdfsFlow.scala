@@ -24,34 +24,30 @@ object HdfsFlow {
   /**
    * Scala API: creates a Flow for [[org.apache.hadoop.fs.FSDataOutputStream]]
    *
-   * @param fs Hadoop file system
    * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param settings hdfs writing settings
    */
   def data(
-      fs: FileSystem,
       fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
       settings: HdfsWritingSettings
   ): Flow[HdfsWriteMessage[ByteString, NotUsed], RotationMessage, NotUsed] =
-    dataWithPassThrough[NotUsed](fs, fc, syncStrategy, rotationStrategy, settings)
+    dataWithPassThrough[NotUsed](fc, syncStrategy, rotationStrategy, settings)
       .collect(OnlyRotationMessage)
 
   /**
    * Scala API: creates a Flow for [[org.apache.hadoop.fs.FSDataOutputStream]]
    * with `passThrough` of type `C`
    *
-   * @param fs Hadoop file system
    * @param fc Hadoop file context
    * @param syncStrategy sync strategy
    * @param rotationStrategy rotation strategy
    * @param settings hdfs writing settings
    */
   def dataWithPassThrough[P](
-      fs: FileSystem,
       fc: FileContext,
       syncStrategy: SyncStrategy,
       rotationStrategy: RotationStrategy,
@@ -63,7 +59,7 @@ object HdfsFlow {
           syncStrategy,
           rotationStrategy,
           settings,
-          DataWriter(fs, fc, settings.pathGenerator, settings.overwrite)
+          DataWriter(fc, settings.pathGenerator, settings.overwrite)
         )
       )
 
@@ -120,8 +116,8 @@ object HdfsFlow {
           rotationStrategy,
           settings,
           CompressedDataWriter(
-            fs,
             fc,
+            fs.getConf,
             compressionCodec,
             settings.pathGenerator,
             settings.overwrite

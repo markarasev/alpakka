@@ -8,7 +8,7 @@ import akka.annotation.InternalApi
 import akka.stream.alpakka.hdfs.FilePathGenerator
 import akka.stream.alpakka.hdfs.impl.writer.HdfsWriter._
 import org.apache.hadoop.fs.permission.FsPermission
-import org.apache.hadoop.fs.{FileContext, FileSystem, Options, Path}
+import org.apache.hadoop.fs.{FileContext, Options, Path}
 
 /**
  * Internal API
@@ -34,10 +34,6 @@ private[hdfs] trait HdfsWriter[W, I] {
   def rotate(rotationCount: Long): HdfsWriter[W, I]
 
   protected def target: Path
-
-  // FIXME remove when finished
-  @deprecated
-  protected def fs: FileSystem
 
   protected def fc: FileContext
 

@@ -8,7 +8,7 @@ import akka.annotation.InternalApi
 import akka.stream.alpakka.hdfs.FilePathGenerator
 import akka.stream.alpakka.hdfs.impl.writer.HdfsWriter._
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileContext, FileSystem, Path}
+import org.apache.hadoop.fs.{FileContext, Path}
 import org.apache.hadoop.io.SequenceFile.{CompressionType, Writer}
 import org.apache.hadoop.io.compress.CompressionCodec
 import org.apache.hadoop.io.{SequenceFile, Writable}
@@ -18,7 +18,6 @@ import org.apache.hadoop.io.{SequenceFile, Writable}
  */
 @InternalApi
 private[writer] final case class SequenceWriter[K <: Writable, V <: Writable](
-    override val fs: FileSystem,
     override val fc: FileContext,
     conf: Configuration, // FIXME deduplicate with fc
     writerOptions: Seq[Writer.Option],
@@ -55,7 +54,6 @@ private[writer] final case class SequenceWriter[K <: Writable, V <: Writable](
 @InternalApi
 private[hdfs] object SequenceWriter {
   def apply[K <: Writable, V <: Writable](
-      fs: FileSystem,
       fc: FileContext,
       conf: Configuration,
       classK: Class[K],
@@ -64,7 +62,6 @@ private[hdfs] object SequenceWriter {
       overwrite: Boolean
   ): SequenceWriter[K, V] =
     new SequenceWriter[K, V](
-      fs,
       fc,
       conf,
       options(classK, classV),
@@ -74,7 +71,6 @@ private[hdfs] object SequenceWriter {
     )
 
   def apply[K <: Writable, V <: Writable](
-      fs: FileSystem,
       fc: FileContext,
       conf: Configuration,
       compressionType: CompressionType,
@@ -84,8 +80,7 @@ private[hdfs] object SequenceWriter {
       pathGenerator: FilePathGenerator,
       overwrite: Boolean
   ): SequenceWriter[K, V] =
-    new SequenceWriter[K, V](fs,
-                             fc,
+    new SequenceWriter[K, V](fc,
                              conf,
                              options(compressionType, compressionCodec, classK, classV),
                              pathGenerator,

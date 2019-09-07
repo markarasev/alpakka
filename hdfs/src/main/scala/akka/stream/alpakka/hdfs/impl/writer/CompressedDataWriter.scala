@@ -11,7 +11,8 @@ import akka.stream.alpakka.hdfs.FilePathGenerator
 import akka.stream.alpakka.hdfs.impl.writer.HdfsWriter._
 import akka.util.ByteString
 import org.apache.commons.io.FilenameUtils
-import org.apache.hadoop.fs.{CreateFlag, FSDataOutputStream, FileContext, FileSystem, Options, Path}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{CreateFlag, FSDataOutputStream, FileContext, Options, Path}
 import org.apache.hadoop.io.compress.{CodecPool, CompressionCodec, CompressionOutputStream, Compressor}
 
 /**
@@ -19,8 +20,8 @@ import org.apache.hadoop.io.compress.{CodecPool, CompressionCodec, CompressionOu
  */
 @InternalApi
 private[writer] final case class CompressedDataWriter(
-    override val fs: FileSystem,
     override val fc: FileContext,
+    conf: Configuration, // FIXME deduplicate with fc
     compressionCodec: CompressionCodec,
     override val pathGenerator: FilePathGenerator,
     maybeTargetPath: Option[Path],
@@ -29,7 +30,7 @@ private[writer] final case class CompressedDataWriter(
 
   override protected lazy val target: Path = getOrCreatePath(maybeTargetPath, outputFileWithExtension(0))
 
-  private val compressor: Compressor = CodecPool.getCompressor(compressionCodec, fs.getConf)
+  private val compressor: Compressor = CodecPool.getCompressor(compressionCodec, conf)
   private val cmpOutput: CompressionOutputStream = compressionCodec.createOutputStream(output, compressor)
 
   require(compressor ne null, "Compressor cannot be null")
@@ -74,11 +75,11 @@ private[writer] final case class CompressedDataWriter(
 @InternalApi
 private[hdfs] object CompressedDataWriter {
   def apply(
-      fs: FileSystem,
       fc: FileContext,
+      conf: Configuration, // FIXME deduplicate with fc
       compressionCodec: CompressionCodec,
       pathGenerator: FilePathGenerator,
       overwrite: Boolean
   ): CompressedDataWriter =
-    new CompressedDataWriter(fs, fc, compressionCodec, pathGenerator, None, overwrite)
+    new CompressedDataWriter(fc, conf, compressionCodec, pathGenerator, None, overwrite)
 }
